@@ -224,6 +224,26 @@
   </div>
 </div>
 
+<script type="module">
+  // In-browser speech recognition (Whisper) — works on any OS, offline after first load.
+  let _t=null,_p=null;
+  window.aquoraTranscribe = async (f32, onstatus)=>{
+    if(!_t){
+      if(!_p){ _p=(async()=>{
+        const m = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.1.2");
+        m.env.allowLocalModels=false;
+        _t = await m.pipeline("automatic-speech-recognition","Xenova/whisper-tiny.en",{
+          progress_callback:(x)=>{ if(onstatus && x && x.status==="progress") onstatus("Loading voice model… "+Math.round(x.progress||0)+"%"); }
+        });
+        return _t;
+      })(); }
+      if(onstatus) onstatus("Loading voice model…");
+      await _p;
+    }
+    const out = await _t(f32);
+    return (out && out.text || "").trim();
+  };
+</script>
 <script>
 (function(){
   "use strict";
@@ -476,14 +496,40 @@ const ANSWERS=[{"re": "saliniti|salt|melio|drain|groundwater|reclaim|wash|leach"
   document.addEventListener("keydown",e=>{if(e.key==="ArrowRight")go(idx+1);if(e.key==="ArrowLeft")go(idx-1);});
   $("#voice").addEventListener("click",function(){voiceOn=!voiceOn;this.classList.toggle("on",voiceOn);this.textContent=voiceOn?"🔊":"🔇";if(!voiceOn)stopAudio();});
 
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  $("#mic").addEventListener("click",function(){
-    if(!SR){const qi=document.getElementById("qin");if(qi)qi.focus();cap.textContent="Type your question below and press Ask.";return;}
-    const r=new SR();r.lang="en-US";r.interimResults=false;this.classList.add("on");stt.textContent="Listening…";
-    r.onresult=e=>{const t=e.results[0][0].transcript;cap.textContent="You asked: “"+t+"”";ask(t);};
-    r.onend=()=>{$("#mic").classList.remove("on");};
-    r.onerror=()=>{$("#mic").classList.remove("on");stt.textContent="Ready";};
-    r.start();});
+  // Microphone → record → Whisper (in-browser) → ask. Works on any OS incl. Linux.
+  let micState="idle",mrec=null,rchunks=[],rstream=null,rtimer=null;
+  function stopRec(){if(rtimer){clearTimeout(rtimer);rtimer=null;}if(mrec&&mrec.state!=="inactive")mrec.stop();}
+  async function onRecStop(){
+    micState="busy";$("#mic").classList.remove("on");
+    if(rstream){rstream.getTracks().forEach(t=>t.stop());rstream=null;}
+    try{
+      const blob=new Blob(rchunks,{type:(mrec&&mrec.mimeType)||"audio/webm"});
+      if(blob.size<1200){micState="idle";stt.textContent="Ready";cap.textContent="Didn't catch that — try again or type your question.";return;}
+      const ac=new (window.AudioContext||window.webkitAudioContext)();
+      const ab=await ac.decodeAudioData(await blob.arrayBuffer());
+      const off=new OfflineAudioContext(1,Math.max(1,Math.ceil(ab.duration*16000)),16000);
+      const s=off.createBufferSource();s.buffer=ab;s.connect(off.destination);s.start();
+      const rb=await off.startRendering();const f32=rb.getChannelData(0);
+      stt.textContent="Transcribing…";cap.textContent="…";
+      const text=await window.aquoraTranscribe(f32,(m)=>{stt.textContent=m;});
+      micState="idle";
+      if(!text){stt.textContent="Ready";cap.textContent="Didn't catch that — try again or type your question.";return;}
+      cap.textContent="You asked: “"+text+"”";ask(text);
+    }catch(e){micState="idle";stt.textContent="Ready";cap.textContent="Voice failed — please type your question.";}
+  }
+  async function micToggle(){
+    if(micState==="recording"){stopRec();return;}
+    if(micState==="busy")return;
+    if(!navigator.mediaDevices||!window.MediaRecorder){document.getElementById("qin").focus();cap.textContent="Voice not supported here — type your question.";return;}
+    try{rstream=await navigator.mediaDevices.getUserMedia({audio:true});}
+    catch(e){cap.textContent="Microphone blocked — click “Allow”, or type your question.";return;}
+    stopAudio();rchunks=[];mrec=new MediaRecorder(rstream);
+    mrec.ondataavailable=e=>{if(e.data&&e.data.size)rchunks.push(e.data);};
+    mrec.onstop=onRecStop;
+    micState="recording";$("#mic").classList.add("on");stt.textContent="Listening… (click 🎤 to stop)";
+    mrec.start();rtimer=setTimeout(stopRec,12000);
+  }
+  $("#mic").addEventListener("click",micToggle);
   const qin=document.getElementById("qin"),qsend=document.getElementById("qsend");
   function doAsk(){const v=qin.value.trim();if(v){qin.value="";ask(v);}}
   qsend.addEventListener("click",doAsk);
