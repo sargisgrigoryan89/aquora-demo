@@ -240,11 +240,14 @@ const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
     setSpeaking(true); var p=v.play(); if(p&&p.catch)p.catch(function(){}); }
   function screenClip(scr){ for(var j=0;j<INTENTS.length;j++){ if(INTENTS[j].screen===scr) return "presenter/ans_"+j+".mp4"; } return "presenter/ans_13.mp4"; }
   function deliver(d,g){ if(g!==gen)return;
-    if(d&&d.fallback){ if(d.screen){activate(d.screen);showScreen(d.screen);} stopAudio();
-      cap.textContent=d.answer||""; speakTTS(d.answer||""); return; }
+    if(d&&d.fallback){ handoffThenSpeak(d,g); return; }
     if(d&&d.video_url){ if(d.screen){activate(d.screen);showScreen(d.screen);} cap.textContent=d.answer||"";
       var vu=d.video_url; if(vu.charAt(0)==="/")vu=SERVER+vu; playClip(vu,function(){}); return; }
     stopAudio(); cap.textContent=(d&&d.answer)?d.answer:"Sorry — I could not answer that just now."; }
+  function handoffThenSpeak(d,g){ if(g!==gen)return;
+    if(d.screen){activate(d.screen);showScreen(d.screen);}
+    cap.textContent=d.answer||"";
+    playClip("presenter/handoff.mp4", function(){ if(g!==gen)return; speakTTS(d.answer||""); }); }
   function pollJob(job,g,n){ if(g!==gen)return;
     if(n>80){ stopAudio(); cap.textContent="That took too long — please ask again."; return; }
     setTimeout(function(){ if(g!==gen)return;
@@ -519,11 +522,11 @@ const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
     if(/^\s*((hi|hello|hey|yo|salam|salom)\b|\u043f\u0440\u0438\u0432\u0435\u0442|\u0437\u0434\u0440\u0430\u0432\u0441\u0442\u0432|\u0434\u043e\u0431\u0440\u044b\u0439)/i.test(ql)){ activate("dashboard");showScreen("dashboard"); cap.textContent="Hello! I\u2019m your Aquora guide \u2014 ask me anything about the system, or take the tour."; playClip("presenter/ans_13.mp4",function(){}); return; }
     var lq=LOCAL_QA[normQ(q)];
     if(lq){ if(lq.screen){activate(lq.screen);showScreen(lq.screen);} cap.textContent=lq.answer||""; playClip("qa/"+lq.file,function(){}); return; }
-    stopAudio(); cap.textContent="\u2026"; stt.textContent="Thinking\u2026";
+    cap.textContent="\u2026"; stt.textContent="Thinking\u2026"; playFiller();
     fetch(SERVER+"/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q:q})})
       .then(function(r){return r.json();}).then(function(d){ if(g!==gen)return;
         if(d&&d.status==="ready") deliver(d,g);
-        else if(d&&d.status==="pending"&&d.job){ playFiller(); pollJob(d.job,g,0); }
+        else if(d&&d.status==="pending"&&d.job) pollJob(d.job,g,0);
         else localFallback(q,g);
       }).catch(function(){ localFallback(q,g); });
   }
