@@ -238,6 +238,14 @@ const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
         else if(d.status==="error"){ stopAudio(); cap.textContent="Sorry — I could not answer that just now."; }
         else pollJob(job,g,n+1);
       }).catch(function(){ pollJob(job,g,n+1); }); },3000); }
+  function localFallback(q,g){ if(g!==gen)return;
+    var ql=q.toLowerCase();
+    for(var j=0;j<INTENTS.length;j++){ if(new RegExp(INTENTS[j].re,"i").test(ql)){ var it=INTENTS[j];
+      if(it.screen){activate(it.screen);showScreen(it.screen);} cap.textContent=it.ans+(it.follow?(" "+it.follow):"");
+      playClip("presenter/ans_"+j+".mp4",function(){}); return; } }
+    activate("dashboard");showScreen("dashboard");
+    cap.textContent="Ask me about any part of the system — requests, irrigation, sensors, melioration, billing, payments and more.";
+    playClip("presenter/ans_13.mp4",function(){}); }
 
   const $=s=>document.querySelector(s), content=$("#content"), menuEl=$("#menu"),
         cap=$("#cap"), crumb=$("#crumb"), assistant=$("#assistant"), stt=$("#stt");
@@ -491,21 +499,15 @@ const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
   }
   function ask(q){
     if(!q)return;gen++;const g=gen;stopAudio();
-    const ql=q.toLowerCase();let k=-1;
+    const ql=q.toLowerCase();
     for(var ai=0;ai<ACTIONS.length;ai++){ if(new RegExp(ACTIONS[ai].re,"i").test(ql)){ runFlow(ACTIONS[ai].flow); return; } }
-    for(let j=0;j<INTENTS.length;j++){ if(new RegExp(INTENTS[j].re,"i").test(ql)){k=j;break;} }
-    if(k>=0){ const it=INTENTS[k];
-      if(it.screen){activate(it.screen);showScreen(it.screen);}
-      cap.textContent=it.ans+(it.follow?(" "+it.follow):"");
-      playClip("presenter/ans_"+k+".mp4",function(){}); return;
-    }
     cap.textContent="\u2026"; stt.textContent="Thinking\u2026"; playFiller();
     fetch(SERVER+"/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q:q})})
       .then(function(r){return r.json();}).then(function(d){ if(g!==gen)return;
         if(d&&d.status==="ready") deliver(d,g);
         else if(d&&d.status==="pending"&&d.job) pollJob(d.job,g,0);
-        else { stopAudio(); cap.textContent="Sorry \u2014 I could not answer that just now."; }
-      }).catch(function(){ if(g===gen){ stopAudio(); cap.textContent="The live assistant is offline right now \u2014 try one of the topics, or ask again shortly."; } });
+        else localFallback(q,g);
+      }).catch(function(){ localFallback(q,g); });
   }
 
   /* navigate */
