@@ -226,7 +226,8 @@ const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
     setSpeaking(true); var p=v.play(); if(p&&p.catch)p.catch(function(){}); }
   function screenClip(scr){ for(var j=0;j<INTENTS.length;j++){ if(INTENTS[j].screen===scr) return "presenter/ans_"+j+".mp4"; } return "presenter/ans_13.mp4"; }
   function deliver(d,g){ if(g!==gen)return;
-    if(d&&d.fallback){ if(d.screen){activate(d.screen);showScreen(d.screen);} cap.textContent=d.answer||""; playClip(screenClip(d.screen),function(){}); return; }
+    if(d&&d.fallback){ if(d.screen){activate(d.screen);showScreen(d.screen);} stopAudio(); setSpeaking(false);
+      cap.textContent=d.answer||""; return; }
     if(d&&d.video_url){ if(d.screen){activate(d.screen);showScreen(d.screen);} cap.textContent=d.answer||"";
       var vu=d.video_url; if(vu.charAt(0)==="/")vu=SERVER+vu; playClip(vu,function(){}); return; }
     stopAudio(); cap.textContent=(d&&d.answer)?d.answer:"Sorry — I could not answer that just now."; }
