@@ -547,9 +547,12 @@ const ANSWERS=[{"re": "saliniti|salt|melio|drain|groundwater|reclaim|wash|leach"
     recState="recording";$("#mic").classList.add("on");stt.textContent="Listening… tap 🎤 to stop";
     mrec.start();rtimer=setTimeout(stopRec,12000);
   }
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
   function toggleListen(){
+    const canRec=navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder;
+    if(SR&&!isIOS)return srFlow();      // desktop/Android: SpeechRecognition (like invest)
+    if(canRec)return whisperFlow();     // iPhone/Safari: record + Whisper (getUserMedia prompts for mic)
     if(SR)return srFlow();
-    if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder)return whisperFlow();
     document.getElementById("qin").focus();cap.textContent="Voice not supported here — type your question and I'll answer by voice.";
   }
   $("#mic").addEventListener("click",toggleListen);
