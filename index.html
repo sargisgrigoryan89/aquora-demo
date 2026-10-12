@@ -208,6 +208,11 @@
 const INTENTS=[{"re": "оплат|заплат|плат[её]ж|плачу|банк|долг|задолж|кви?танц|pay|payment|bank|debt|settle", "screen": "payments", "ans": "I'm opening Payments. A user pays the water bill right from their phone through the bank, and Aquora reconciles every payment automatically and clears the debt in real time.", "follow": "Want me to show how a payment closes an outstanding bill?"}, {"re": "заявк|заказ.{0,4}вод|подать заявк|попрос|хочу вод|хочу полит|нужн.{0,4}вод|request water|apply for water|ask for water|order water|new request", "screen": "requests", "ans": "Let's request water. On the Requests screen a user simply asks for water — by voice, or with the New request button — and the system turns the request into an irrigation plan.", "follow": "Shall I show how a request becomes a ten-day plan?"}, {"re": "полив|поливать|график|когда полит|сколько вод|норм[аеоы]|декад|irrig|watering|schedule|how much water|when to water", "screen": "irrigation", "ans": "From each crop and its water norm I build a ten-day irrigation schedule for the whole season, and tell every farmer exactly when to water and how much. Cotton needs about twelve irrigations, rice around twenty.", "follow": "Would you like to see a sample ten-day plan?"}, {"re": "культур|посев|севооборот|хлопок|пшениц|рис\\b|люцерн|crop|sow|rotation|cotton|wheat|rice|alfalfa", "screen": "crops", "ans": "For every plot we record the crop, its sowing date and the rotation, because the crop sets the water norm. The plan then follows the rotation, season after season.", "follow": "Want to see how a crop sets its water norm?"}, {"re": "отпуск|уеду|уезжа|пауз.{0,4}вод|отключи.{0,4}вод|приостанов|vacation|away|pause|holiday", "screen": "sensors", "ans": "Just tell me you're going away — for example, pause my water from the first to the fifteenth — and I schedule the valve to close and reopen the day you're back.", "follow": "Shall I set a vacation pause as a demo?"}, {"re": "датчик|сенсор|сч[её]тчик|утечк|уровень|влажн|измер|iot|sensor|meter|leak|flow|level|soil moist", "screen": "sensors", "ans": "Every connection is metered live — drinking water in, wastewater out, irrigation, plus canal flow, water levels and soil moisture. Because I watch the flow every second, I can spot a leak and close the valve automatically.", "follow": "Would you like to see the live sensor readings?"}, {"re": "мелиор|засол|сол[её]н|дренаж|промыв|грунтов|melio|salin|\\bsalt|drain|groundwater|reclaim|leach|washing", "screen": "melioration", "ans": "Melioration protects the land itself. Sensors track soil salinity and the groundwater level zone by zone, and when salt builds up Aquora schedules leaching irrigations and drainage to keep the farmland productive.", "follow": "Want to see which plots need leaching now?"}, {"re": "карт|канал|шлюз|водохран|\\bсеть|map|canal|gate|network|reservoir", "screen": "map", "ans": "The map shows the whole network — the reservoir, the main canal and its branches, the gates and the plots. Each canal reports its flow and how far its gate is open, all as live layers.", "follow": "Would you like to open a canal and see its flow?"}, {"re": "лимит|квот|выделен|распределен.{0,6}сезон|limit|allocat|quota", "screen": "limits", "ans": "Each zone gets a seasonal water allocation, tracked against real demand, so managers always know how much water is still available.", "follow": "Shall I show a zone's remaining allocation?"}, {"re": "диспетч|распредел|dispatch|distribut", "screen": "dispatch", "ans": "Dispatchers see the daily distribution across every canal — planned versus actual — so any shortfall shows up immediately.", "follow": "Want to compare plan versus actual for a canal?"}, {"re": "сч[её]т|начислен|тариф|квитанц|биллинг|bill|invoice|charge|tariff", "screen": "billing", "ans": "Billing is built from the real metered volume, never estimated. Bills are issued automatically and every invoice is emailed to the user.", "follow": "Want to see how a bill is calculated from the meter?"}, {"re": "отч[её]т|экспорт|выгруз|report|export|excel|pdf|transparen", "screen": "reports", "ans": "Every view — requests, water balance, plan versus fact, collection, losses — can be filtered and exported to Excel or PDF in one click, for full transparency.", "follow": "Which report would you like to export?"}, {"re": "пользовател|фермер|регистрац|абонент|лицев|домохоз|user|register|farmer|household|account|subscriber", "screen": "users", "ans": "Every farm and household is registered with its plots and area. People can be added by an operator, or register themselves just by speaking.", "follow": "Want to see a water user's profile?"}, {"re": "привет|здравств|помощь|что.{0,4}умеешь|кто ты|hello|\\bhi\\b|help|what can you|what do you", "screen": "dashboard", "ans": "Hello! I'm Aquora, your water-system assistant. I run the whole cycle — registration, crops, the irrigation schedule, sensors, melioration, billing and payments — by hand or by voice.", "follow": "What would you like to do — request water, check the schedule, or pay a bill?"}];
 const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
 
+  var ACTIONS=[
+   {re:"make .*request|new request|request water|create .*request|оформить заявк|подать заявк|заказать воду|хочу .{0,6}воду|нужна вода|создать заявк", flow:"req"},
+   {re:"receive water|get water|sign .{0,6}act|confirm .*deliver|подтвердить подач|получить воду|подача воды|подписать акт|акт прием", flow:"del"},
+   {re:"\bpay\b|pay .{0,6}bill|pay for water|оплати|оплатить|заплатить|оплата воды", flow:"pay"}
+  ];
   function playClip(src,after){ stopAudio();
     var v=document.getElementById("avatarVid"); if(!src||!v){ if(after)after(); return; }
     var done=false; function fin(){ if(done)return; done=true; setSpeaking(false); if(after)after(); }
@@ -289,15 +294,23 @@ const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
     ])}</div>`;
 
   S.requests=()=>`<h1 class="ptitle">Requests</h1><p class="psub">Users ask for water; the system turns it into a plan.</p>
-    ${filters(["Year","Crop","Status"],"+ New request")}
-    <div id="reqtable">${table(["#","Water user","Crop","Volume","Period","Status"],[
-      ["1593","Water User 1041","Cotton","4,120 m³","Season",tg("ok","approved")],
-      ["1592","Water User 1044","Wheat","2,300 m³","Season",tg("warn","review")],
-    ])}</div>`;
+    <div style="margin:4px 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="btn primary" data-flow="req">💧 Make a water request</button>
+      ${FLOW.req?'<span class="tag ok">request created ✓</span>':'<span class="psub">— click to request water, as a farmer would</span>'}</div>
+    <div id="reqtable">${table(["#","Water user","Crop","Volume","Period","Status"],
+      (FLOW.req?[["1594","Water User 1041","Cotton","4,120 m³","Decade 7–9",tg("ok","planned")]]:[]).concat([
+        ["1593","Water User 1041","Cotton","4,120 m³","Season",tg("ok","approved")],
+        ["1592","Water User 1044","Wheat","2,300 m³","Season",tg("warn","review")],
+      ]))}</div>
+    ${FLOW.req?`<div class="card" style="max-width:620px;margin-top:14px"><div class="stripe"></div><div class="lbl">Request accepted → plan created</div>
+      <div style="margin-top:6px">Your request became a <b>ten-day irrigation plan</b>. Next: open <b>Irrigation</b> to receive the water.
+      <button class="btn" data-flow="goirr" style="margin-left:8px">Go to Irrigation ▶</button></div></div>`:''}`;
 
   S.irrigation=()=>`<h1 class="ptitle">Irrigation plan</h1><p class="psub">When to water each field — a ten-day schedule from crop norms.</p>
     <div class="card" style="max-width:640px;margin-bottom:16px"><div class="stripe"></div><div class="lbl">Next irrigation due</div>
-      <div style="font-size:17px;margin-top:6px">Plot #1041-1 · Cotton — <b>in 2 days</b> (decade 7) · <span class="num">1,130 m³</span></div></div>
+      <div style="font-size:17px;margin-top:6px">Plot #1041-1 · Cotton — <b>${FLOW.del?'delivered ✓':'in 2 days'}</b> (decade 7) · <span class="num">1,130 m³</span></div>
+      ${FLOW.req&&!FLOW.del?`<button class="btn primary" data-flow="del" style="margin-top:12px">🚰 Confirm water delivered (sign act)</button>`:''}
+      ${FLOW.del?`<div style="margin-top:10px;color:var(--good)">✓ Delivered <b>4,120 m³</b> · acceptance act signed · charge created from the metered volume. <button class="btn" data-flow="gopay" style="margin-left:8px">Go to Payment ▶</button></div>`:''}</div>
     ${table(["Plot","Crop","Norm (gross)","Irrigations","Season volume"],[
       ["#1041-1","Cotton","6,800 m³/ha","12","13,600 m³"],
       ["#1041-2","Wheat","4,200 m³/ha","8","8,400 m³"],
@@ -342,20 +355,24 @@ const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
 
   S.billing=()=>`<h1 class="ptitle">Billing</h1><p class="psub">Charges built from the real metered volume.</p>
     ${filters(["Year","Month","Status"],"+ Charge",true)}
-    ${table(["#","Water user","Volume","Tariff","Charged","Debt","Status"],[
-      ["1595","Water User 1041","1,983 m³","0.05 $/m³","99.15","89.15",tg("warn","partial")],
-      ["1594","Water User 1044","3,200 m³","0.05 $/m³","160.00","160.00",tg("crit","pending")],
-      ["1591","Water User 1042","2,500 m³","0.05 $/m³","125.00","0.00",tg("ok","paid")],
-    ])}`;
+    ${table(["#","Water user","Volume","Tariff","Charged","Debt","Status"],
+      (FLOW.del?[["1596","Water User 1041","4,120 m³","0.05 $/m³","206.00",(FLOW.paid?"0.00":"206.00"),FLOW.paid?tg("ok","paid"):tg("crit","unpaid")]]:[]).concat([
+        ["1595","Water User 1041","1,983 m³","0.05 $/m³","99.15","89.15",tg("warn","partial")],
+        ["1594","Water User 1044","3,200 m³","0.05 $/m³","160.00","160.00",tg("crit","pending")],
+        ["1591","Water User 1042","2,500 m³","0.05 $/m³","125.00","0.00",tg("ok","paid")],
+      ]))}`;
 
   S.payments=()=>`<h1 class="ptitle">Payments</h1><p class="psub">Users pay by bank; the system reconciles automatically.</p>
+    ${FLOW.del&&!FLOW.paid?`<div class="card" style="max-width:620px;margin-bottom:14px"><div class="stripe crit"></div><div class="lbl" style="color:var(--amber)">Outstanding bill</div><div style="margin-top:6px">Water User 1041 · Cotton · 4,120 m³ — <b class="num">$206.00</b> due.</div><button class="btn primary" data-flow="pay" style="margin-top:12px">💳 Pay now (by bank)</button></div>`:''}
+    ${FLOW.paid?`<div class="card" style="max-width:620px;margin-bottom:14px"><div class="stripe"></div><div class="lbl" style="color:var(--good)">✓ Payment received</div><div style="margin-top:6px"><b>$206.00</b> paid by bank · reconciled automatically · debt cleared.</div></div>`:''}
     <div class="kpis" style="grid-template-columns:repeat(3,1fr);max-width:620px">
       ${kpi("Paid","824,816","$","good")}${kpi("Debt","284,150","$","amber")}${kpi("Collection","91","%","aqua")}</div>
-    ${table(["Water user","Amount","Method","Date","Status"],[
-      ["Water User 1041","375.00","Bank","12 Oct",tg("ok","paid")],
-      ["Water User 1044","250.00","Bank","12 Oct",tg("ok","paid")],
-      ["Water User 1042","125.00","Bank","11 Oct",tg("ok","paid")],
-    ])}`;
+    ${table(["Water user","Amount","Method","Date","Status"],
+      (FLOW.paid?[["Water User 1041","206.00","Bank","today",tg("ok","paid")]]:[]).concat([
+        ["Water User 1041","375.00","Bank","12 Oct",tg("ok","paid")],
+        ["Water User 1044","250.00","Bank","12 Oct",tg("ok","paid")],
+        ["Water User 1042","125.00","Bank","11 Oct",tg("ok","paid")],
+      ]))}`;
 
   S.reports=()=>`<h1 class="ptitle">Reports</h1><p class="psub">Everything, filtered and exported in one click.</p>
     ${filters(["Report","Period","Region"],"⬇ Export")}
@@ -387,6 +404,19 @@ const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
   function focus(sel,el){const t=(el||content).querySelector(sel);if(t){t.classList.add("focus-ring");setTimeout(()=>t.classList.remove("focus-ring"),6000);}}
 
   function showScreen(id){content.innerHTML=(S[id]||S.dashboard)();animNums(content);}
+
+  /* ---------- interactive workflows (request -> receive -> pay) ---------- */
+  const FLOW={req:false,del:false,paid:false};
+  function screenClipLocal(scr){ if(typeof INTENTS!=="undefined"){ for(var j=0;j<INTENTS.length;j++){ if(INTENTS[j].screen===scr) return "presenter/ans_"+j+".mp4"; } } return "presenter/ans_13.mp4"; }
+  function say2(text,scr){ cap.textContent=text; try{ if(typeof playClip==="function"){ playClip(screenClipLocal(scr),function(){}); } }catch(e){} }
+  function runFlow(step){
+    if(step==="req"){ FLOW.req=true; activate("requests"); showScreen("requests"); say2("A water request is created — and it instantly becomes a ten-day irrigation plan.","requests"); }
+    else if(step==="goirr"){ activate("irrigation"); showScreen("irrigation"); }
+    else if(step==="del"){ FLOW.req=true; FLOW.del=true; activate("irrigation"); showScreen("irrigation"); say2("The water is delivered and the acceptance act is signed. The charge is built from the real metered volume.","irrigation"); }
+    else if(step==="gopay"){ activate("payments"); showScreen("payments"); }
+    else if(step==="pay"){ FLOW.req=true; FLOW.del=true; FLOW.paid=true; activate("payments"); showScreen("payments"); say2("Paid from the phone through the bank. The system reconciles it and clears the debt automatically.","payments"); }
+  }
+  content.addEventListener("click",function(e){ var b=e.target.closest&&e.target.closest("[data-flow]"); if(b){ runFlow(b.getAttribute("data-flow")); } });
 
   /* ---------- in-screen demos ---------- */
   function demoVoiceRequest(){
@@ -462,6 +492,7 @@ const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
   function ask(q){
     if(!q)return;gen++;const g=gen;stopAudio();
     const ql=q.toLowerCase();let k=-1;
+    for(var ai=0;ai<ACTIONS.length;ai++){ if(new RegExp(ACTIONS[ai].re,"i").test(ql)){ runFlow(ACTIONS[ai].flow); return; } }
     for(let j=0;j<INTENTS.length;j++){ if(new RegExp(INTENTS[j].re,"i").test(ql)){k=j;break;} }
     if(k>=0){ const it=INTENTS[k];
       if(it.screen){activate(it.screen);showScreen(it.screen);}
