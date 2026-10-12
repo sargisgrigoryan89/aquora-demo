@@ -209,9 +209,9 @@ const INTENTS=[{"re": "оплат|заплат|плат[её]ж|плачу|ба�
 const SERVER="https://candidate-prints-travis-cgi.trycloudflare.com";
 
   var ACTIONS=[
-   {re:"make .*request|new request|request water|create .*request|оформить заявк|подать заявк|заказать воду|хочу .{0,6}воду|нужна вода|создать заявк", flow:"req"},
-   {re:"receive water|get water|sign .{0,6}act|confirm .*deliver|подтвердить подач|получить воду|подача воды|подписать акт|акт прием", flow:"del"},
-   {re:"\bpay\b|pay .{0,6}bill|pay for water|оплати|оплатить|заплатить|оплата воды", flow:"pay"}
+   {re:"make .*request|new request|request water|create .*request|оформ.{0,4} заявк|подать заявк|заказать воду|хочу .{0,6}воду|нужна вода|созда.{0,4} заявк|заявк. на вод", flow:"req"},
+   {re:"receive water|get water|sign .{0,6}act|confirm .*deliver|подтверд.{0,5} подач|подач.{0,3} вод|получ.{0,5} воду|подписать акт|акт прием", flow:"del"},
+   {re:"\bpay\b|pay .{0,6}bill|pay for water|оплати|оплатить|заплат|оплата воды", flow:"pay"}
   ];
   function playClip(src,after){ stopAudio();
     var v=document.getElementById("avatarVid"); if(!src||!v){ if(after)after(); return; }
