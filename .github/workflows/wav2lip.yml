@@ -44,19 +44,20 @@ jobs:
         run: |
           cd w2l
           mkdir -p checkpoints face_detection/detection/sfd
-          # Wav2Lip GAN checkpoint (try mirrors)
+          # Wav2Lip GAN checkpoint (verified mirror)
           for U in \
-            "https://huggingface.co/camenduru/Wav2Lip/resolve/main/wav2lip_gan.pth" \
-            "https://huggingface.co/numz/wav2lip_studio/resolve/main/wav2lip_gan.pth" ; do
-            curl -L --retry 3 -o checkpoints/wav2lip_gan.pth "$U" && \
+            "https://huggingface.co/Nekochu/Wav2Lip/resolve/main/wav2lip_gan.pth" \
+            "https://huggingface.co/gmk123/wav2lip/resolve/main/wav2lip_gan.pth" ; do
+            curl -L --retry 3 -o checkpoints/wav2lip_gan.pth "$U"
             if [ "$(stat -c%s checkpoints/wav2lip_gan.pth)" -gt 100000000 ]; then echo "got ckpt from $U"; break; fi
           done
           ls -la checkpoints/wav2lip_gan.pth
+          python -c "import torch; torch.load('checkpoints/wav2lip_gan.pth', map_location='cpu'); print('checkpoint OK')"
           # s3fd face detector
           for U in \
-            "https://www.adrianbulat.com/downloads/python-fan/s3fd-619a316812.pth" \
-            "https://huggingface.co/camenduru/Wav2Lip/resolve/main/s3fd.pth" ; do
-            curl -L --retry 3 -o face_detection/detection/sfd/s3fd.pth "$U" && \
+            "https://huggingface.co/Nekochu/Wav2Lip/resolve/main/s3fd.pth" \
+            "https://www.adrianbulat.com/downloads/python-fan/s3fd-619a316812.pth" ; do
+            curl -L --retry 3 -o face_detection/detection/sfd/s3fd.pth "$U"
             if [ "$(stat -c%s face_detection/detection/sfd/s3fd.pth)" -gt 50000000 ]; then echo "got s3fd from $U"; break; fi
           done
           ls -la face_detection/detection/sfd/s3fd.pth
