@@ -1,0 +1,53 @@
+name: faceswap
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Space-separated video paths, or ALL"
+        required: false
+        default: "presenter/0.mp4"
+
+jobs:
+  swap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "numpy<2" cython
+          pip install insightface==0.7.3 onnxruntime==1.17.3 opencv-python-headless imageio-ffmpeg
+
+      - name: Download face-swap model
+        run: |
+          curl -L --retry 3 -o inswapper_128.onnx \
+            https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/inswapper_128.onnx
+          ls -la inswapper_128.onnx
+
+      - name: Run face swap
+        run: |
+          mkdir -p swapped
+          if [ "${{ github.event.inputs.targets }}" = "ALL" ]; then
+            FILES="$(ls presenter/*.mp4 qa/*.mp4)"
+          else
+            FILES="${{ github.event.inputs.targets }}"
+          fi
+          echo "Targets: $FILES"
+          for f in $FILES; do
+            out="swapped/$(echo "$f" | tr '/' '_')"
+            echo "===== $f -> $out ====="
+            python scripts/swap.py assets/source_face.png "$f" "$out" || echo "FAILED $f"
+          done
+          ls -la swapped/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swapped-videos
+          path: swapped/
+          retention-days: 7
