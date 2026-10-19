@@ -33,12 +33,15 @@ jobs:
           pip install librosa==0.10.1 opencv-python-headless==4.9.0.80 scipy tqdm numba==0.58.1 imageio-ffmpeg
           python -c "import numpy,torch,librosa,cv2; print('numpy',numpy.__version__,'torch',torch.__version__,'librosa',librosa.__version__)"
 
-      - name: Patch audio.py for modern librosa
+      - name: Patch Wav2Lip (librosa + codec)
         run: |
           cd w2l
           # mel() is keyword-only in librosa>=0.9
           sed -i 's/librosa\.filters\.mel(hp\.sample_rate, hp\.n_fft,/librosa.filters.mel(sr=hp.sample_rate, n_fft=hp.n_fft,/' audio.py
           grep -n "filters.mel" audio.py || true
+          # DIVX codec is unavailable in headless OpenCV -> use MJPG
+          sed -i "s/cv2.VideoWriter_fourcc(\*'DIVX')/cv2.VideoWriter_fourcc(*'MJPG')/" inference.py
+          grep -n "VideoWriter_fourcc" inference.py || true
 
       - name: Download models
         run: |
@@ -64,7 +67,7 @@ jobs:
 
       - name: Run lip-sync
         run: |
-          mkdir -p swapped
+          mkdir -p swapped temp
           if [ "${{ github.event.inputs.targets }}" = "ALL" ]; then
             FILES="$(ls presenter/*.mp4 qa/*.mp4)"
           else
