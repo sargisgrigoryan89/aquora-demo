@@ -21,8 +21,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install "numpy<2" cython
-          pip install insightface==0.7.3 onnxruntime==1.17.3 opencv-python-headless imageio-ffmpeg
+          pip install numpy==1.26.4 cython
+          pip install onnxruntime==1.17.3 "opencv-python-headless==4.9.0.80" imageio-ffmpeg
+          pip install insightface==0.7.3
+          pip install numpy==1.26.4
+          python -c "import numpy, onnxruntime, cv2, insightface; print('numpy', numpy.__version__); print('ort', onnxruntime.__version__); print('insightface ok')"
 
       - name: Download face-swap model
         run: |
