@@ -1,0 +1,87 @@
+name: wav2lip
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Space-separated video paths (audio source), or ALL"
+        required: false
+        default: "presenter/0.mp4"
+
+jobs:
+  lipsync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Clone Wav2Lip
+        run: |
+          git clone --depth 1 https://github.com/Rudrabha/Wav2Lip.git w2l
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy==1.23.5
+          pip install torch==2.2.2 torchvision==0.17.2 --index-url https://download.pytorch.org/whl/cpu
+          pip install librosa==0.10.1 opencv-python-headless==4.9.0.80 scipy tqdm numba==0.58.1 imageio-ffmpeg
+          python -c "import numpy,torch,librosa,cv2; print('numpy',numpy.__version__,'torch',torch.__version__,'librosa',librosa.__version__)"
+
+      - name: Patch audio.py for modern librosa
+        run: |
+          cd w2l
+          # mel() is keyword-only in librosa>=0.9
+          sed -i 's/librosa\.filters\.mel(hp\.sample_rate, hp\.n_fft,/librosa.filters.mel(sr=hp.sample_rate, n_fft=hp.n_fft,/' audio.py
+          grep -n "filters.mel" audio.py || true
+
+      - name: Download models
+        run: |
+          cd w2l
+          mkdir -p checkpoints face_detection/detection/sfd
+          # Wav2Lip GAN checkpoint (try mirrors)
+          for U in \
+            "https://huggingface.co/camenduru/Wav2Lip/resolve/main/wav2lip_gan.pth" \
+            "https://huggingface.co/numz/wav2lip_studio/resolve/main/wav2lip_gan.pth" ; do
+            curl -L --retry 3 -o checkpoints/wav2lip_gan.pth "$U" && \
+            if [ "$(stat -c%s checkpoints/wav2lip_gan.pth)" -gt 100000000 ]; then echo "got ckpt from $U"; break; fi
+          done
+          ls -la checkpoints/wav2lip_gan.pth
+          # s3fd face detector
+          for U in \
+            "https://www.adrianbulat.com/downloads/python-fan/s3fd-619a316812.pth" \
+            "https://huggingface.co/camenduru/Wav2Lip/resolve/main/s3fd.pth" ; do
+            curl -L --retry 3 -o face_detection/detection/sfd/s3fd.pth "$U" && \
+            if [ "$(stat -c%s face_detection/detection/sfd/s3fd.pth)" -gt 50000000 ]; then echo "got s3fd from $U"; break; fi
+          done
+          ls -la face_detection/detection/sfd/s3fd.pth
+
+      - name: Run lip-sync
+        run: |
+          mkdir -p swapped
+          if [ "${{ github.event.inputs.targets }}" = "ALL" ]; then
+            FILES="$(ls presenter/*.mp4 qa/*.mp4)"
+          else
+            FILES="${{ github.event.inputs.targets }}"
+          fi
+          echo "Targets: $FILES"
+          for f in $FILES; do
+            name="$(echo "$f" | tr '/' '_')"
+            echo "===== $f ====="
+            ffmpeg -y -loglevel error -i "$f" -ac 1 -ar 16000 /tmp/a.wav
+            python w2l/inference.py \
+              --checkpoint_path w2l/checkpoints/wav2lip_gan.pth \
+              --face assets/source_face.png \
+              --audio /tmp/a.wav \
+              --static True --resize_factor 1 --pads 0 15 0 0 \
+              --outfile "swapped/$name" || echo "FAILED $f"
+          done
+          ls -la swapped/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wav2lip-videos
+          path: swapped/
+          retention-days: 7
